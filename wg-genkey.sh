@@ -160,8 +160,10 @@ restart_wg_server() {
             [[ "${svr}" == 'quit' ]] && break
             echo "scp $conf"
             scp "${conf}" root@"$svr":/etc/wireguard/wg0.conf
-            echo "systemctl restart wg-quick@wg0"
-            ssh root@"$svr" "systemctl restart wg-quick@wg0"
+            # echo "systemctl restart wg-quick@wg0"
+            # ssh root@"$svr" "systemctl restart wg-quick@wg0"
+            echo "systemctl reload wg-quick@wg0"
+            ssh root@"$svr" "wg syncconf wg0 <(wg-quick strip wg0)"
             break
         done
         break
@@ -173,6 +175,8 @@ restart_wg_client() {
         [[ "${conf}" == 'quit' ]] && break
         read -rp "Enter client ip: " ip_client
         scp "${conf}" root@"$ip_client":/etc/wireguard/wg0.conf
+        echo "systemctl reload wg-quick@wg0"
+        ssh root@"$ip_client" "wg syncconf wg0 <(wg-quick strip wg0)"
     done
 }
 
@@ -191,7 +195,7 @@ What do you want to do?
     1) New key (client or server)
     2) Exist client to server
     3) Revoke client conf
-    4) Copy conf to server and restart it
+    4) Copy conf to server and reload it
     5) Generate qrcode
     6) Exit
     "
