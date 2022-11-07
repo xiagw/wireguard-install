@@ -132,8 +132,7 @@ gen_qrcode() {
         fi
     fi
     select conf in $me_data/wg*.conf quit; do
-        [[ "${conf}" == 'quit' ]] && break
-        [[ -f "${conf}" ]] || break
+        [[ "${conf}" == 'quit' || ! -f "${conf}" ]] && break
         echo_msg green "${conf}.png"
         qrencode -o "${conf}.png" -t PNG <"$conf"
     done
@@ -158,7 +157,7 @@ restart_wg_server() {
         echo_msg red "selected $conf"
         select svr in $(awk 'NR>1' "$HOME/.ssh/config"* | awk '/^Host/ {print $2}') quit; do
             [[ "${svr}" == 'quit' ]] && break
-            echo "scp $conf"
+            echo "scp $conf to root@$svr:/etc/wireguard/wg0.conf"
             scp "${conf}" root@"$svr":/etc/wireguard/wg0.conf
             # echo "systemctl restart wg-quick@wg0"
             # ssh root@"$svr" "systemctl restart wg-quick@wg0"
@@ -174,6 +173,7 @@ restart_wg_client() {
     select conf in $me_data/wg*.conf quit; do
         [[ "${conf}" == 'quit' ]] && break
         read -rp "Enter client ip: " ip_client
+        echo "${conf} to root@$ip_client:/etc/wireguard/wg0.conf"
         scp "${conf}" root@"$ip_client":/etc/wireguard/wg0.conf
         echo "systemctl reload wg-quick@wg0"
         ssh root@"$ip_client" "wg syncconf wg0 <(wg-quick strip wg0)"
