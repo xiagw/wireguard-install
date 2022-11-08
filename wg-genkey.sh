@@ -162,7 +162,7 @@ restart_wg_server() {
             # echo "systemctl restart wg-quick@wg0"
             # ssh root@"$svr" "systemctl restart wg-quick@wg0"
             echo "systemctl reload wg-quick@wg0"
-            ssh root@"$svr" "wg syncconf wg0 <(wg-quick strip wg0)"
+            ssh root@"$svr" "wg syncconf wg0 <(wg-quick strip wg0); echo sleep 2; sleep 2; wg show"
             break
         done
         break
