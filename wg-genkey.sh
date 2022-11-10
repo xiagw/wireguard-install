@@ -150,7 +150,7 @@ revoke_client() {
     done
 }
 
-restart_wg_server() {
+reload_conf() {
     echo_msg red "Please select sever conf."
     select conf in $me_data/wg*.conf quit; do
         [[ "${conf}" == 'quit' ]] && break
@@ -193,10 +193,10 @@ main() {
     echo "
 What do you want to do?
     1) New key (client or server)
-    2) Exist client to server
-    3) Revoke client conf
-    4) Copy conf to server and reload it
-    5) Generate qrcode
+    2) Exist client to server (peer to peer)
+    3) Copy conf to server and reload it
+    4) Generate qrcode
+    5) Revoke client conf
     6) Exit
     "
     until [[ ${MENU_OPTION} =~ ^[1-6]$ ]]; do
@@ -210,13 +210,13 @@ What do you want to do?
         peer_to_peer
         ;;
     3)
-        revoke_client
+        reload_conf
         ;;
     4)
-        restart_wg_server
+        gen_qrcode
         ;;
     5)
-        gen_qrcode
+        revoke_client
         ;;
     *)
         exit 0
