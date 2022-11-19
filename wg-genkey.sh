@@ -47,7 +47,7 @@ peer_to_peer() {
         s_ip_pri="$(awk '/^Address/ {print $3}' "$s_conf" | head -n 1)"
         s_ip_pri=${s_ip_pri%/24}
         s_port="$(awk '/^ListenPort/ {print $3}' "$s_conf" | head -n 1)"
-        echo "from $s_conf to $c_conf..."
+        echo "set from $s_conf to $c_conf..."
         if ! grep -q "### ${s_conf##*/} begin" "$c_conf"; then
             (
                 echo ""
@@ -66,7 +66,7 @@ peer_to_peer() {
                 echo ""
             ) >>"$c_conf"
         fi
-        echo "from $c_conf to $s_conf..."
+        echo "set from $c_conf to $s_conf..."
         if ! grep -q "### ${c_conf##*/} begin" "$s_conf"; then
             (
                 echo ""
@@ -143,7 +143,7 @@ revoke_client() {
     select conf in $me_data/wg*.conf quit; do
         [[ "$conf" == 'quit' ]] && break
         echo_msg green "selected $conf"
-        sed -i "/^### ${conf##*/} begin/,/^### ${conf##*/} end/d" $me_data/wg*.conf
+        sed -i "/^### ${conf##*/} begin/,/^### ${conf##*/} end/d" "$me_data"/wg*.conf
         rm -f "$conf"
         echo_msg red "revoke $conf done."
         break
@@ -203,24 +203,12 @@ What do you want to do?
         read -rp "Select an option [1-5]: " MENU_OPTION
     done
     case "${MENU_OPTION}" in
-    1)
-        new_key "$@"
-        ;;
-    2)
-        peer_to_peer
-        ;;
-    3)
-        reload_conf
-        ;;
-    4)
-        gen_qrcode
-        ;;
-    5)
-        revoke_client
-        ;;
-    *)
-        exit 0
-        ;;
+    1) new_key "$@" ;;
+    2) peer_to_peer ;;
+    3) reload_conf ;;
+    4) gen_qrcode ;;
+    5) revoke_client ;;
+    *) exit 0 ;;
     esac
 }
 
