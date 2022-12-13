@@ -4,28 +4,40 @@
 
 echo_msg() {
     color_off='\033[0m' # Text Reset
-    case "$1" in
+    case "${1:-none}" in
     red | error | erro) color_on='\033[0;31m' ;;       # Red
     green | info) color_on='\033[0;32m' ;;             # Green
     yellow | warning | warn) color_on='\033[0;33m' ;;  # Yellow
     blue) color_on='\033[0;34m' ;;                     # Blue
     purple | question | ques) color_on='\033[0;35m' ;; # Purple
     cyan) color_on='\033[0;36m' ;;                     # Cyan
-    time) color_on="[$(date +%Y%m%d-%T)], " color_off='' ;;
-    step | timestep)
-        color_on="\033[0;33m[$(date +%Y%m%d-%T)] step-$((STEP + 1)), \033[0m"
-        color_off=
-        STEP=$((STEP + 1))
+    time)
+        color_on="[+] $(date +%Y%m%d-%T-%u), "
+        color_off=''
         ;;
-    *) color_on='' color_off='' ;;
+    stepend)
+        color_on="[+] $(date +%Y%m%d-%T-%u), "
+        color_off=' ... end'
+        ;;
+    step | timestep)
+        color_on="\033[0;33m[$((${STEP:-0} + 1))] $(date +%Y%m%d-%T-%u), \033[0m"
+        STEP=$((${STEP:-0} + 1))
+        color_off=' ... start'
+        ;;
+    *)
+        color_on=''
+        color_off=''
+        need_shift=0
+        ;;
     esac
-    shift
-    echo -e "${color_on}$*${color_off}"
+    [ "${need_shift:-1}" -eq 1 ] && shift
+    need_shift=1
+    echo -e "\n${color_on}$*${color_off}\n"
 }
 
 peer_to_peer() {
     if [[ "$new_key_flag" -ne 1 ]]; then
-        echo_msg green "\n### Please select << client >> side conf...\n"
+        echo_msg green "### Please select << client >> side conf..."
         select c_conf in $me_data/wg*.conf quit; do
             [[ "$c_conf" == 'quit' ]] && exit 1
             break
@@ -38,16 +50,17 @@ peer_to_peer() {
         c_port="$(awk '/^ListenPort/ {print $3}' "$c_conf" | head -n 1)"
     fi
     ## select server
-    echo_msg red "\n### Please select ====< server >==== side conf...\n"
+    echo_msg red "### Please select ====< server >==== side conf"
     select s_conf in $me_data/wg*.conf quit; do
         [[ "$s_conf" == 'quit' ]] && break
-        echo_msg red "selected file is $s_conf"
+        echo_msg red "(Have selected $s_conf)"
         s_key_pub="$(awk '/^### pubkey:/ {print $3}' "$s_conf" | head -n 1)"
         s_ip_pub="$(awk '/^### pubip:/ {print $3}' "$s_conf" | head -n 1)"
         s_ip_pri="$(awk '/^Address/ {print $3}' "$s_conf" | head -n 1)"
         s_ip_pri=${s_ip_pri%/24}
         s_port="$(awk '/^ListenPort/ {print $3}' "$s_conf" | head -n 1)"
-        echo "set from $s_conf to $c_conf..."
+        echo_msg red  "From $s_conf"
+        echo_msg green "To $c_conf"
         if ! grep -q "### ${s_conf##*/} begin" "$c_conf"; then
             (
                 echo ""
@@ -101,22 +114,22 @@ new_key() {
     c_key_pri="$(wg genkey)"
     c_key_pub="$(echo "$c_key_pri" | wg pubkey)"
     c_key_pre="$(wg genpsk)"
-    (
-        echo ""
-        echo "### ${c_conf##*/} $c_comment"
-        echo "[Interface]"
-        echo "PrivateKey = $c_key_pri"
-        echo "### PresharedKey = $c_key_pre"
-        echo "### pubkey: $c_key_pub"
-        echo "### pubip: $c_ip_pub"
-        echo "Address = $c_ip_pri/24"
-        echo "ListenPort = $c_port"
-        echo "## DNS = 192.168.1.1, 8.8.8.8, 8.8.4.4, 114.114.114.114"
-        echo "## MTU = 1420"
-        echo "## PostUp   = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
-        echo "## PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
-        echo ""
-    ) >"$c_conf"
+    cat >"$c_conf" <<EOF
+
+### ${c_conf##*/} $c_comment
+[Interface]
+PrivateKey = $c_key_pri
+### PresharedKey = $c_key_pre
+### pubkey: $c_key_pub
+### pubip: $c_ip_pub
+Address = $c_ip_pri/24
+ListenPort = $c_port
+## DNS = 192.168.1.1, 8.8.8.8, 8.8.4.4, 114.114.114.114
+## MTU = 1420
+## PostUp   = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+## PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+EOF
     new_key_flag=1
     peer_to_peer
 }
@@ -128,7 +141,7 @@ gen_qrcode() {
         elif uname -s | grep -q Darwin; then
             brew install qrencode
         else
-            echo "qrencode not exists"
+            echo_msg yellow "qrencode not exists"
         fi
     fi
     select conf in $me_data/wg*.conf quit; do
@@ -142,7 +155,8 @@ revoke_client() {
     echo_msg green "Please select client conf (revoke it)."
     select conf in $me_data/wg*.conf quit; do
         [[ "$conf" == 'quit' ]] && break
-        echo_msg green "selected $conf"
+        echo_msg green "(Have selected $conf)"
+        echo_msg yellow "Please select server...(read from ~/.ssh/config)"
         sed -i "/^### ${conf##*/} begin/,/^### ${conf##*/} end/d" "$me_data"/wg*.conf
         rm -f "$conf"
         echo_msg red "revoke $conf done."
@@ -151,17 +165,17 @@ revoke_client() {
 }
 
 reload_conf() {
-    echo_msg red "Please select sever conf."
+    echo_msg red "Please select wg conf."
     select conf in $me_data/wg*.conf quit; do
         [[ "${conf}" == 'quit' ]] && break
-        echo_msg red "selected $conf"
+        echo_msg red "(Have selected $conf)"
         select svr in $(awk 'NR>1' "$HOME/.ssh/config"* | awk '/^Host/ {print $2}') quit; do
             [[ "${svr}" == 'quit' ]] && break
-            echo "scp $conf to root@$svr:/etc/wireguard/wg0.conf"
+            echo_msg yellow "scp $conf to root@$svr:/etc/wireguard/wg0.conf"
             scp "${conf}" root@"$svr":/etc/wireguard/wg0.conf
             # echo "systemctl restart wg-quick@wg0"
             # ssh root@"$svr" "systemctl restart wg-quick@wg0"
-            echo "systemctl reload wg-quick@wg0"
+            echo_msg yellow "wg syncconf wg0 <(wg-quick strip wg0)"
             ssh root@"$svr" "wg syncconf wg0 <(wg-quick strip wg0); echo sleep 2; sleep 2; wg show"
             break
         done
@@ -173,9 +187,9 @@ restart_wg_client() {
     select conf in $me_data/wg*.conf quit; do
         [[ "${conf}" == 'quit' ]] && break
         read -rp "Enter client ip: " ip_client
-        echo "${conf} to root@$ip_client:/etc/wireguard/wg0.conf"
+        echo_msg yellow "${conf} to root@$ip_client:/etc/wireguard/wg0.conf"
         scp "${conf}" root@"$ip_client":/etc/wireguard/wg0.conf
-        echo "systemctl reload wg-quick@wg0"
+        echo_msg yellow "wg syncconf wg0 <(wg-quick strip wg0)"
         ssh root@"$ip_client" "wg syncconf wg0 <(wg-quick strip wg0)"
     done
 }
@@ -195,7 +209,7 @@ What do you want to do?
     1) New key (client or server)
     2) Exist client to server (peer to peer)
     3) Copy conf to server and reload it
-    4) Generate qrcode
+    4) Generate qrcode from conf
     5) Revoke client conf
     6) Exit
     "
