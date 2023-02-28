@@ -35,7 +35,7 @@ _msg() {
     echo -e "\n${color_on}$*${color_off}\n"
 }
 
-_update_exist_conf() {
+_update_existing_conf() {
     if [[ "$new_key_flag" -ne 1 ]]; then
         _msg green "### Please select << client >> side conf..."
         select c_conf in $me_data/wg*.conf quit; do
@@ -59,8 +59,9 @@ _update_exist_conf() {
         s_ip_pri="$(awk '/^Address/ {print $3}' "$s_conf" | head -n 1)"
         s_ip_pri=${s_ip_pri%/24}
         s_port="$(awk '/^ListenPort/ {print $3}' "$s_conf" | head -n 1)"
-        _msg red "From $s_conf"
-        _msg green "To $c_conf"
+        _msg red "From: $s_conf"
+        _msg green "To: $c_conf"
+        read -rp "Set route: [IP/MASK,IP/MASK] " read_ip_route
         if ! grep -q "### ${s_conf##*/} begin" "$c_conf"; then
             (
                 echo ""
@@ -69,10 +70,10 @@ _update_exist_conf() {
                 echo "PublicKey = $s_key_pub"
                 echo "# PresharedKey = $c_key_pre"
                 echo "endpoint = $s_ip_pub:$s_port"
-                if [[ "${s_ip_pri}" == '10.9.0.27' ]]; then
-                    echo "AllowedIPs = ${s_ip_pri}/32, 192.168.1.0/24"
-                else
+                if [[ -z ${read_ip_route} ]]; then
                     echo "AllowedIPs = ${s_ip_pri}/32"
+                else
+                    echo "AllowedIPs = ${s_ip_pri}/32, ${read_ip_route}"
                 fi
                 echo "PersistentKeepalive = 60"
                 echo "### ${s_conf##*/} end"
@@ -131,7 +132,7 @@ ListenPort = $c_port
 
 EOF
     new_key_flag=1
-    _update_exist_conf
+    _update_existing_conf
 }
 
 _get_qrcode() {
@@ -204,22 +205,25 @@ main() {
     echo "
 What do you want to do?
     1) New key (client or server)
-    2) Update exist conf (peer to peer)
-    3) Upload conf to server/client and reload it
-    4) Convert to qrcode from conf
+    2) Update existing conf (peer to peer)
+    3) Upload conf to (client or server) and reload it
+    4) Convert conf to qrcode
     5) Revoke server/client conf
     6) Quit
-    "
+"
     until [[ ${MENU_OPTION} =~ ^[1-6]$ ]]; do
         read -rp "Select an option [1-6]: " MENU_OPTION
     done
     case "${MENU_OPTION}" in
     1) _new_key "$@" ;;
-    2) _update_exist_conf ;;
+    2) _update_existing_conf ;;
     3) _reload_conf ;;
     4) _get_qrcode ;;
     5) _revoke_client ;;
-    *) exit 0 ;;
+    *)
+        echo "Invalid option: $MENU_OPTION"
+        exit 0
+        ;;
     esac
 }
 
