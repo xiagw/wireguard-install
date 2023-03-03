@@ -145,6 +145,7 @@ _get_qrcode() {
             _msg yellow "qrencode not exists"
         fi
     fi
+    local conf
     select conf in $me_data/wg*.conf quit; do
         [[ "${conf}" == 'quit' || ! -f "${conf}" ]] && break
         _msg green "${conf}.png"
@@ -167,9 +168,16 @@ _revoke_client() {
 
 _restart_host() {
     _msg yellow "scp $conf to root@$host:/etc/wireguard/wg0.conf"
-    scp "${conf}" root@"$host":/etc/wireguard/wg0.conf
-    _msg yellow "wg syncconf wg0 <(wg-quick strip wg0); wg show"
-    ssh root@"$host" "wg syncconf wg0 <(wg-quick strip wg0); echo sleep 2; sleep 2; wg show"
+    if scp "${conf}" root@"$host":/etc/wireguard/wg0.conf; then
+        _msg yellow "wg syncconf wg0 <(wg-quick strip wg0); wg show"
+        if ssh root@"$host" "wg syncconf wg0 <(wg-quick strip wg0); echo sleep 2; sleep 2; wg show"; then
+            _msg green "Wireguard restarted on $host"
+        else
+            _msg red "Error restarting Wireguard on $host"
+        fi
+    else
+        _msg red "Error copying $conf to $host"
+    fi
 }
 
 _reload_conf() {
