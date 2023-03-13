@@ -3,7 +3,8 @@
 # set -xe
 
 _msg() {
-    color_off='\033[0m' # Text Reset
+    local color_on
+    local color_off='\033[0m' # Text Reset
     case "${1:-none}" in
     red | error | erro) color_on='\033[0;31m' ;;       # Red
     green | info) color_on='\033[0;32m' ;;             # Green
@@ -15,31 +16,31 @@ _msg() {
         color_on="[+] $(date +%Y%m%d-%T-%u), "
         color_off=''
         ;;
-    stepend)
-        color_on="[+] $(date +%Y%m%d-%T-%u), "
-        color_off=' ... end'
-        ;;
     step | timestep)
-        color_on="\033[0;33m[$((${STEP:-0} + 1))] $(date +%Y%m%d-%T-%u), \033[0m"
+        color_on="\033[0;36m[$((${STEP:-0} + 1))] $(date +%Y%m%d-%T-%u), \033[0m"
         STEP=$((${STEP:-0} + 1))
         color_off=' ... start'
         ;;
+    stepend | end)
+        color_on="[+] $(date +%Y%m%d-%T-%u), "
+        color_off=' ... end'
+        ;;
     *)
-        color_on=''
-        color_off=''
-        need_shift=0
+        color_on=
+        color_off=
         ;;
     esac
-    [ "${need_shift:-1}" -eq 1 ] && shift
-    need_shift=1
-    echo -e "\n${color_on}$*${color_off}\n"
+    if [ "$#" -gt 1 ]; then
+        shift
+    fi
+    echo -e "${color_on}$*${color_off}"
 }
 
-_update_existing_conf() {
+_set_peer2peer() {
     if [[ "$new_key_flag" -ne 1 ]]; then
         _msg green "### Please select << client >> side conf..."
         select c_conf in $me_data/wg*.conf quit; do
-            [[ "$c_conf" == 'quit' ]] && exit 1
+            [[ "$c_conf" == 'quit' ]] && exit
             break
         done
         c_key_pub="$(awk '/^### pubkey:/ {print $3}' "$c_conf" | head -n 1)"
@@ -132,7 +133,7 @@ ListenPort = $c_port
 
 EOF
     new_key_flag=1
-    _update_existing_conf
+    _set_peer2peer
 }
 
 _get_qrcode() {
@@ -213,8 +214,8 @@ main() {
     echo "
 What do you want to do?
     1) New key (client or server)
-    2) Update existing conf (peer to peer)
-    3) Upload conf to (client or server) and reload it
+    2) Set peer to peer (exists conf)
+    3) Upload conf and reload (client/server)
     4) Convert conf to qrcode
     5) Revoke server/client conf
     6) Quit
@@ -224,7 +225,7 @@ What do you want to do?
     done
     case "${MENU_OPTION}" in
     1) _new_key "$@" ;;
-    2) _update_existing_conf ;;
+    2) _set_peer2peer ;;
     3) _reload_conf ;;
     4) _get_qrcode ;;
     5) _revoke_client ;;
